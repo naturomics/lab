@@ -36,10 +36,17 @@
 #define ENV_STATUS_UNINITIALIZED -2
 #define ENV_STATUS_INITIALIZED -1
 
+// Python 3.* compatible.
+#if PY_MAJOR_VERSION >= 3
+	#define PyInt_AsLong PyLong_AsLong
+	#define PyInt_FromLong PyLong_FromLong
+#endif
+
 static char runfiles_path[4096];  // set in initdeepmind_lab() below
 
 typedef struct {
   PyObject_HEAD
+	struct _typeobject *ob_type;
   EnvCApi* env_c_api;
   void* context;
   int status;
@@ -148,8 +155,13 @@ static int Lab_init(LabObject* self, PyObject* args, PyObject* kwds) {
     char *key, *value;
 
     while (PyDict_Next(config, &pos, &pykey, &pyvalue)) {
+			#if PY_MAJOR_VERSION >= 3 
+      key = PyUnicode_AsUTF8(pykey);
+      value = PyUnicode_AsUTF8(pyvalue);
+      #else
       key = PyString_AsString(pykey);
       value = PyString_AsString(pyvalue);
+      #endif
       if (key == NULL || value == NULL) {
         return -1;
       }
@@ -167,7 +179,11 @@ static int Lab_init(LabObject* self, PyObject* args, PyObject* kwds) {
 
   char* observation_name;
   for (int i = 0; i < self->observation_count; ++i) {
+		#if PY_MAJOR_VERSION >= 3
+    observation_name = PyUnicode_AsUTF8(PyList_GetItem(observations, i));
+		#else
     observation_name = PyString_AsString(PyList_GetItem(observations, i));
+		#endif
     if (observation_name == NULL) {
       return -1;
     }
@@ -207,7 +223,11 @@ static PyObject* Lab_reset(LabObject* self, PyObject* args, PyObject* kwds) {
   if (seed_arg == NULL || seed_arg == Py_None) {
     seed = rand();
   } else {
+		#if PY_MAJOR_VERSION >= 3
+    if (!PyLong_Check(seed_arg)) {
+		#else
     if (!PyInt_Check(seed_arg)) {
+		#endif
       PyErr_Format(PyExc_ValueError, "'seed' must be int or None, was '%s'.",
                    Py_TYPE(seed_arg)->tp_name);
       return NULL;
@@ -521,12 +541,34 @@ static PyMethodDef module_methods[] = {
     {NULL, NULL, 0, NULL} /* sentinel */
 };
 
+#if PY_MAJOR_VERSION >= 3
+static struct PyModuleDef moduledef = {
+	PyModuleDef_HEAD_INIT,
+	"deepmind_lab",
+	"DeepMind Lab API module",
+	-1,
+	module_methods,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+};
+#endif
+
+#if PY_MAJOR_VERSION >= 3
+PyMODINIT_FUNC PyInit_deepmind_lab(void) {
+#else
 PyMODINIT_FUNC initdeepmind_lab(void) {
+#endif
   PyObject* m;
 
   if (PyType_Ready(&deepmind_lab_LabType) < 0) return;
 
+#if PY_MAJOR_VERSION >= 3
+  m = PyModule_Create(&moduledef);
+#else
   m = Py_InitModule3("deepmind_lab", module_methods, "DeepMind Lab API module");
+#endif
 
   Py_INCREF(&deepmind_lab_LabType);
   PyModule_AddObject(m, "Lab", (PyObject*)&deepmind_lab_LabType);
@@ -547,4 +589,5 @@ PyMODINIT_FUNC initdeepmind_lab(void) {
   srand(time(NULL));
 
   import_array();
+	return m;
 }
