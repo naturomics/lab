@@ -56,12 +56,7 @@ new_local_repository(
     path = "/usr",
 )
 new_local_repository(
-    name = "libxml_archive",
-    build_file = 'libxml_local.BUILD',
-    path = "/usr",
-)
-new_local_repository(
-    name = "zlib_archive",
-    build_file = 'zlib_local.BUILD',
+    name = "python3_system",
+    build_file = "python3.BUILD",
     path = "/usr",
 )
